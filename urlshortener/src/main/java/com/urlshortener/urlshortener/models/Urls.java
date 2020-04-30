@@ -1,17 +1,26 @@
 package com.urlshortener.urlshortener.models;
 import org.bson.types.ObjectId;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+import org.springframework.security.access.annotation.Secured;
 
-import java.sql.Date;
+
 import java.time.LocalDate;
-
+import java.time.LocalDateTime;
+import java.util.Date;
+@Document
 public class Urls {
     @Id
     public ObjectId _id;
     public String URL;
     public String hash;
+    @Field
+    @Indexed(name="date_expire", expireAfterSeconds=0)
     public LocalDate date;
+
+    public LocalDate creationDate;
     public String userMail;
     public int noOfClick;
     public Urls(){}
@@ -23,6 +32,7 @@ public class Urls {
        this.date = date;
        this.userMail = userMail;
        this.noOfClick = noOfClick;
+       this.creationDate = LocalDate.now();
     }
 
 
@@ -38,9 +48,12 @@ public class Urls {
     public String getHash() { return hash; }
     public void setHash(String hash) { this.hash = hash; }
 
-    public LocalDate date() { return date; }
+    public LocalDate getdate() { return date; }
     public void setDate(LocalDate date) { this.date = date; }
 
     public int getNoOfClick() { return noOfClick; }
     public void setNoOfClick(int noOfClick) { this.noOfClick = noOfClick; }
+
+    public LocalDate getCreationDate() { return creationDate; }
+
 }
