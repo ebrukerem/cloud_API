@@ -35,20 +35,13 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers(HttpMethod.POST, "/registration").permitAll()
                // .anyRequest().authenticated()
                 .and()
+
                 .addFilter(new JWTAuthenticationFilter(authenticationManager()))
                 .addFilter(new JWTAuthorizationFilter(authenticationManager()))
                 // this disables session creation on Spring Security
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
     }
 
-    @Override
-    public void configure(AuthenticationManagerBuilder auth) throws Exception {
-        auth.userDetailsService(userDetailsService).passwordEncoder(bCryptPasswordEncoder);
-        auth.inMemoryAuthentication()
-                .withUser("admin")
-                .password("pass")
-                .roles("ADMIN");
-    }
 
     @Bean
     CorsConfigurationSource corsConfigurationSource() {

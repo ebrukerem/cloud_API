@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -15,7 +16,8 @@ public interface UserRepository extends MongoRepository<Users, String> {
     @Query("{ 'email' : ?0 }")
     List<Users> findByMail(String email);
 
-
+    @Query("{'date' : { $gte: ?0, $lte: ?1 } }")
+    List<Users> findByDateBetween(LocalDate from, LocalDate to);
 }
 
 
