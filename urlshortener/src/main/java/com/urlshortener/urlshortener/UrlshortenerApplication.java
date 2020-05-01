@@ -13,6 +13,7 @@ public class UrlshortenerApplication {
 	public BCryptPasswordEncoder bCryptPasswordEncoder() {
 		return new BCryptPasswordEncoder();
 	}
+
 	public static void main(String[] args) {
 		SpringApplication.run(UrlshortenerApplication.class, args);
 	}

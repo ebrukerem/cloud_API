@@ -1,12 +1,14 @@
 package com.urlshortener.urlshortener.controllers;
 import com.urlshortener.urlshortener.models.Urls;
+import com.urlshortener.urlshortener.models.Users;
 import com.urlshortener.urlshortener.repositories.URLRepository;
 import com.urlshortener.urlshortener.repositories.UserRepository;
-import org.apache.tomcat.util.net.openssl.ciphers.Authentication;
+import org.springframework.security.core.Authentication;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import com.google.common.hash.Hashing;
 import org.apache.commons.validator.routines.UrlValidator;
@@ -17,6 +19,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 import java.util.Random;
 
@@ -25,7 +30,8 @@ import java.util.Random;
 public class URLController {
     @Autowired
     private URLRepository repository;
-
+    @Autowired
+    private UserRepository userRepository;
 
     Logger logger = LoggerFactory.getLogger(URLRepository.class);
     @RequestMapping(value = "/shorten", method = RequestMethod.POST)
@@ -50,14 +56,14 @@ public class URLController {
                 hash = get_SHA_1_SecurePassword(hash, salt);
                 hash = hash.substring(1,6);
                 System.out.println("URL Id generated: "+ hash);
-                Urls urlNew= new Urls(ObjectId.get(),url.getURL(),hash,url.getUserMail(), java.time.LocalDate.now(),0);
+                Urls urlNew= new Urls(ObjectId.get(),url.getURL(),hash,url.getUserMail(), url.getdate(),0);
                 urlNew.set_id(ObjectId.get());
                 repository.save(urlNew);
                 System.out.println(urlNew);
                 return urlNew;
             }
             else{
-                if(repository.findByUsermail(url.getUserMail()).isEmpty())
+                if(repository.findByURLAndUsermail(url.getUserMail(),url.getURL()).isEmpty())
                 {
                         String hash = Hashing.murmur3_32().hashString(url.getURL(), StandardCharsets.UTF_8).toString();
 
@@ -70,7 +76,7 @@ public class URLController {
                         hash = get_SHA_1_SecurePassword(hash, salt);
                         hash = hash.substring(1, 6);
                         System.out.println("URL Id generated: " + hash);
-                        Urls urlNew = new Urls(ObjectId.get(), url.getURL(), hash, url.getUserMail(), java.time.LocalDate.now(), 0);
+                        Urls urlNew = new Urls(ObjectId.get(), url.getURL(), hash, url.getUserMail(),  url.getdate(), 0);
                         urlNew.set_id(ObjectId.get());
                         repository.save(urlNew);
                         System.out.println(urlNew);
@@ -80,7 +86,7 @@ public class URLController {
                 }
 
                 else{
-                    System.out.println(url.getUserMail());
+
                     logger.warn("This url has been created", repository.findByUrl(url.getURL()).get(0).getHash());
                     return repository.findByUrl(url.getURL()).get(0);
 
@@ -96,18 +102,18 @@ public class URLController {
 
     @RequestMapping(value = "/customshorten", method = RequestMethod.POST)
     public Urls createCustomURL(@Valid @RequestBody Urls url,@RequestHeader String hash ) {
-            if(repository.findByUrl(url.getURL()).isEmpty())
+            if(repository.findByUrl(url.getURL()).isEmpty() )
             {
-                Urls urlNew= new Urls(ObjectId.get(),url.getURL(),hash,url.getUserMail(), java.time.LocalDate.now(),0);
+                Urls urlNew= new Urls(ObjectId.get(),url.getURL(),hash,url.getUserMail(), url.getdate(),0);
                 urlNew.set_id(ObjectId.get());
                 repository.save(urlNew);
                 System.out.println(urlNew);
                 return urlNew;
             }
             else{
-                if(repository.findByUsermail(url.getUserMail()).isEmpty())
+                if(repository.findByURLAndUsermail(url.getUserMail(),url.getURL()).isEmpty())
                 {
-                        Urls urlNew = new Urls(ObjectId.get(), url.getURL(), hash, url.getUserMail(), java.time.LocalDate.now(), 0);
+                        Urls urlNew = new Urls(ObjectId.get(), url.getURL(), hash, url.getUserMail(), url.getdate(), 0);
                         urlNew.set_id(ObjectId.get());
                         repository.save(urlNew);
                         System.out.println(urlNew);
@@ -129,12 +135,99 @@ public class URLController {
 
     }
 
+    @RequestMapping (value = "/lastMonthsUrlCreationAnalytics", method = RequestMethod.GET)
+    public int[] urlAnalytics(@RequestHeader String user) {
+        int[] urlA = new int[12];
+        if(userRepository.findByMail(user).get(0).getRole().equals("admin"))
+        {
+            urlA[0] = repository.findByDateBetween(LocalDate.now(),LocalDate.now().plusMonths(1)).size();
+            for(int i = 0; i < urlA.length - 1; i++)
+            {
+                urlA[i + 1] = repository.findByDateBetween(LocalDate.now().minusMonths(i+1),LocalDate.now().minusMonths(i)).size();
+            }
+            return urlA;
+        }
+        else{
+            logger.warn("You dont have authorization");
+            return null;
+        }
+
+    }
+
+    @RequestMapping (value = "/lastMonthsRedirectionAnalytics", method = RequestMethod.GET)
+    public int[] redirectionAnalytics(@RequestHeader String user) {
+        int[] urlA = new int[12];
+        if(userRepository.findByMail(user).get(0).getRole().equals("admin"))
+        {
+            for(int j = 0; j < 12; j++)
+            {
+                List<Urls> u = repository.findBycreationDateBetween(LocalDate.now().minusMonths(j+1),LocalDate.now().minusMonths(j));
+                int count = 0;
+                for(int i= 0; i < u.size(); i++)
+                {
+                    count+= u.get(i).getNoOfClick();
+                }
+                urlA[j] = count;
+            }
+            return urlA;
+
+        }
+        else{
+            logger.warn("You dont have authorization");
+            return null;
+        }
+
+    }
+
+
+    @RequestMapping (value = "/lastMonthsUserLinkAnalytics", method = RequestMethod.POST)
+    public int[] userLinkAnalytics(@RequestBody Users user,@RequestHeader String admin) {
+        int[] urlA = new int[12];
+        if(userRepository.findByMail(admin).get(0).getRole().equals("admin"))
+        {
+
+            List<Urls> a = repository.findByDateBetween(LocalDate.now(),LocalDate.now().plusMonths(1));
+            int count = 0;
+            for(int i= 0; i < a.size(); i++)
+            {
+
+                if(a.get(i).getUserMail().equals(user.getEmail()))
+                {
+                    count+= a.get(i).getNoOfClick();
+                }
+
+            }
+            urlA[0] = count;
+            for(int j = 0; j < 11; j++)
+            {
+                List<Urls> u = repository.findByDateBetween(LocalDate.now().minusMonths(j+1),LocalDate.now().minusMonths(j));
+                count = 0;
+                for(int i= 0; i < u.size(); i++)
+                {
+
+                    if(u.get(i).getUserMail().equals(user.getEmail()))
+                    {
+                        count+= u.get(i).getNoOfClick();
+                    }
+
+                }
+                urlA[j+1] = count;
+            }
+            return urlA;
+
+        }
+        else{
+            logger.warn("You dont have authorization");
+            return null;
+        }
+
+    }
 
     @GetMapping(value = "/{hash}")
     public void getUrl(@PathVariable String hash, HttpServletResponse httpServletResponse) {
         if(repository.findByHashing(hash).isEmpty())
         {
-            throw new RuntimeException("There is no shorter URL for : " + hash);
+            throw new RuntimeException("There is no  URL for : " + hash);
         }
         else{
             Urls url = repository.findByHashing(hash).get(0);
@@ -147,6 +240,7 @@ public class URLController {
         }
 
     }
+
 
 
     @RequestMapping(value = "/mostpopularOverall", method = RequestMethod.GET)
